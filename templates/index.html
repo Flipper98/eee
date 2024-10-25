@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Университетское приложение</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.6/main.min.css' rel='stylesheet' />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/telegram-web-app/7.0.0/telegram-web-app.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.6/main.min.js'></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="space-y-6">
+            <!-- Кнопка для открытия в Telegram -->
+            <button id="telegram-open" class="bg-blue-500 text-white px-4 py-2 rounded">Открыть в Telegram</button>
+
+            <!-- Календарь -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-2xl font-bold mb-4">Календарь расписания</h2>
+                <div id="calendar"></div>
+            </div>
+
+            <!-- Список студентов -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-2xl font-bold mb-4">Студенты</h2>
+                <div id="students" class="space-y-4">
+                    <form id="studentForm" class="space-y-4">
+                        <input type="text" name="name" placeholder="Имя" class="w-full p-2 border rounded">
+                        <input type="email" name="email" placeholder="Email" class="w-full p-2 border rounded">
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Добавить</button>
+                    </form>
+                    <div id="studentsList" class="mt-4"></div>
+                </div>
+            </div>
+
+            <!-- Предметы -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-2xl font-bold mb-4">Предметы</h2>
+                <div id="subjects" class="space-y-4">
+                    <form id="subjectForm" class="space-y-4">
+                        <input type="text" name="name" placeholder="Название предмета" class="w-full p-2 border rounded">
+                        <input type="text" name="professor" placeholder="Преподаватель" class="w-full p-2 border rounded">
+                        <textarea name="description" placeholder="Описание" class="w-full p-2 border rounded"></textarea>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Добавить</button>
+                    </form>
+                    <div id="subjectsList" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        window.Telegram.WebApp.ready();
+
+        document.getElementById('telegram-open').addEventListener('click', () => {
+            window.Telegram.WebApp.show();
+        });
+
+        // Загрузка календаря расписания
+        async function loadSchedule() {
+            const response = await fetch('/api/schedule');
+            const events = await response.json();
+            const calendarEl = document.getElementById('calendar');
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'ru',
+                events: events.map(event => ({
+                    title: event.summary,
+                    start: event.start,
+                    end: event.end,
+                    description: event.description,
+                    location: event.location,
+                })),
+                eventClick: function(info) {
+                    alert(`Место: ${info.event.extendedProps.location}\nОписание: ${info.event.extendedProps.description}`);
+                }
+            });
+
+            calendar.render();
+        }
+
+        // Загрузка студентов
+        async function loadStudents() {
+            const response = await fetch('/api/students');
+            const students = await response.json();
+            const studentsDiv = document.getElementById('studentsList');
+
+            studentsDiv.innerHTML = students.map(student => `
+                <div class="border p-4 rounded">
+                    <h3 class="font-bold">${student.name}</h3>
+                    <p>${student.email}</p>
+                </div>
+            `).join('');
+        }
+
+        // Загрузка предметов
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectsDiv = document.getElementById('subjectsList');
+
+            subjectsDiv.innerHTML = subjects.map(subject => `
+                <div class="border p-4 rounded">
+                    <h3 class="font-bold">${subject.name}</h3>
+                    <p>Преподаватель: ${subject.professor}</p>
+                    <p>${subject.description}</p>
+                </div>
+            `).join('');
+        }
+
+        // Обработка форм
+        document.getElementById('studentForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            await fetch('/api/students', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+            loadStudents();
+            e.target.reset();
+        };
+
+        document.getElementById('subjectForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            await fetch('/api/subjects', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+            loadSubjects();
+            e.target.reset();
+        };
+
+        // Инициализация
+        loadSchedule();
+        loadStudents();
+        loadSubjects();
+    </script>
+</body>
+</html>
